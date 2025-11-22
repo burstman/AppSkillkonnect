@@ -1,7 +1,9 @@
+//go:generate fyne bundle -o bundle.go assets
+
 package main
 
 import (
-	"image/color"
+	"fmt"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -9,38 +11,21 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	skilltheme "skillKonnectApp/pkg/theme"
+	"skillKonnectApp/pkg/ui"
 )
-
-type skillKonnectTheme struct{}
-
-// Color lets you override specific named colors.
-func (skillKonnectTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
-	switch name {
-	case theme.ColorNamePrimary:
-		return color.RGBA{R: 0x28, G: 0x7D, B: 0xF7, A: 0xFF} // brand blue
-	}
-	// fall back to Fyne's default theme
-	return theme.DefaultTheme().Color(name, variant)
-}
-
-func (skillKonnectTheme) Font(style fyne.TextStyle) fyne.Resource {
-	return theme.DefaultTheme().Font(style)
-}
-
-func (skillKonnectTheme) Size(name fyne.ThemeSizeName) float32 {
-	return theme.DefaultTheme().Size(name)
-}
-
-func (skillKonnectTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
-	return theme.DefaultTheme().Icon(name)
-}
 
 func main() {
 	// Create the app
 	a := app.New()
 
+	// Use bundled theme icons from bundle.go
+	lightIcon := resourceThemeLightlPng
+	darkIcon := resourceDarckThemePng
+
 	// Usage:
-	a.Settings().SetTheme(skillKonnectTheme{})
+	a.Settings().SetTheme(skilltheme.NewSkillKonnectTheme(theme.VariantLight))
 
 	// Main window
 	w := a.NewWindow("SkillKonnect")
@@ -55,31 +40,56 @@ func main() {
 	// - Average Android phone: ~360-410 width, ~800-900 height
 	w.Resize(fyne.NewSize(390, 844)) // iPhone 12/13 size - good Android approximation
 
-	// UI elements
-	title := widget.NewLabel("Welcome to SkillKonnect")
-	title.Alignment = fyne.TextAlignCenter
-	title.TextStyle = fyne.TextStyle{Bold: true}
+	// Theme toggle setup
+	isDarkTheme := false // Start with LIGHT theme
 
-	subtitle := widget.NewLabel("Connect skills, build networks")
-	subtitle.Alignment = fyne.TextAlignCenter
+	var ThemeBtn *widget.Button
+	ThemeBtn = widget.NewButtonWithIcon("", darkIcon, func() {
+		isDarkTheme = !isDarkTheme
+		fmt.Println("Theme toggled. isDarkTheme:", isDarkTheme)
 
-	getStartedBtn := widget.NewButton("Get Started", func() {
-		pop := widget.NewPopUp(widget.NewLabel("Hello from mobile!"), w.Canvas())
-		pop.Show()
+		if isDarkTheme {
+			ThemeBtn.SetIcon(lightIcon)
+			a.Settings().SetTheme(skilltheme.NewSkillKonnectTheme(theme.VariantDark))
+			fmt.Println("Applied Dark theme")
+		} else {
+			ThemeBtn.SetIcon(darkIcon)
+			a.Settings().SetTheme(skilltheme.NewSkillKonnectTheme(theme.VariantLight))
+			fmt.Println("Applied Light theme")
+		}
+		w.Content().Refresh()
 	})
 
-	// Layout
-	content := container.NewVBox(
+	// Top bar with theme toggle button
+	topBar := container.NewHBox(
 		layout.NewSpacer(),
-		title,
-		subtitle,
-		layout.NewSpacer(),
-		getStartedBtn,
-		layout.NewSpacer(),
+		ThemeBtn,
 	)
 
-	// Center everything with padding (looks great on phones)
-	w.SetContent(container.NewPadded(container.NewCenter(content)))
+	// Welcome screen with "Get Started" button that opens main screen
+	welcomeScreen := ui.CreateWelcomeScreen(func() {
+		// When "Get Started" is clicked, show the main screen
+		mainScreen := ui.CreateMainScreen()
+		mainLayout := container.NewBorder(
+			topBar,     // Top (keep theme button)
+			nil,        // Bottom
+			nil,        // Left
+			nil,        // Right
+			mainScreen, // Center (main screen content)
+		)
+		w.SetContent(mainLayout)
+	})
+
+	// Initial layout with welcome screen
+	initialLayout := container.NewBorder(
+		topBar,        // Top
+		nil,           // Bottom
+		nil,           // Left
+		nil,           // Right
+		welcomeScreen, // Center (welcome screen)
+	)
+
+	w.SetContent(initialLayout)
 
 	// Make sure window is visible
 	w.Show()
